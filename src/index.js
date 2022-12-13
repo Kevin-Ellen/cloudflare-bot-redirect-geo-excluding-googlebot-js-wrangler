@@ -17,7 +17,7 @@ const pages = {
   index: {
     status:200,
     title: `Link selector page - Not redirected - Geo-redirect-exlcusion-test`,
-    canonical: `https://cloudflare-bot-redirect-geo-excluding-googlebot-js-wrangler.boxlab.workers.dev/`,
+    canonical: `https://geo-redirect-exclusions.boxlab.dev/`,
     html: `<h1>You have not been redirected!</h1>
     <p>Your user-agent contains one of the following strings:</p>
     <ul>
@@ -32,14 +32,14 @@ const pages = {
   uk: {
     status: 200,
     title: `UK page - Geo-redirect-exlcusion-test`,
-    canonical: `https://cloudflare-bot-redirect-geo-excluding-googlebot-js-wrangler.boxlab.workers.dev/uk`,
+    canonical: `https://geo-redirect-exclusions.boxlab.dev/uk`,
     html: `<h1>UK page</h1>
     <p>You are currently seeing the UK page now.</p>`
   },
   other: {
     status: 200,
     title: `Other page - Geo-redirect-exlcusion-test`,
-    canonical: `https://cloudflare-bot-redirect-geo-excluding-googlebot-js-wrangler.boxlab.workers.dev/other`,
+    canonical: `https://geo-redirect-exclusions.boxlab.dev/other`,
     html: `<h1>Other page</h1>
     <p>You are currently seeing the other countries page now.</p>`
   },
@@ -70,16 +70,16 @@ const handleRequest = async (request) => {
 
     // UK page
     if(url.pathname === '/uk'){
-      return response(pages.uk);
+      return response(pages.uk, url);
     }
 
     // Other page
     if(url.pathname === '/other'){
-      return response(pages.other);
+      return response(pages.other, url);
     }
 
     // No page found, let's 404
-    return response(pages.notFound);
+    return response(pages.notFound, url);
 
   }
 
@@ -99,13 +99,13 @@ const handleRequest = async (request) => {
 
   // If the UA matches in the array, show the page
   if(matched){
-    return response(pages.index);
+    return response(pages.index, url);
   }
 
   // We not know that our user-agent is not excluded from the redirects, we also know that the request is to the root page. So now we can use a geo-redirect.
 
-  // We store the country of the request first
-  const country = request.cf.country;
+  // We store the country of the request first  - For some reason `request.cf.country does not work, so we grab the header field similar to the user-agent
+  const country = request.headers.get('CF-IPCountry') || '';
 
   // if the country is set to the UK (GB), redirect to the UK
   if(country === 'GB'){
@@ -127,25 +127,34 @@ const handleRequest = async (request) => {
 }
 
 // Create a simple function to formulate a response, allowing for DRY
-const response = (data) => new Response(
-  `<!DOCTYPE html>
-  <html>
-    <head>
-      <meta charset="utf-8">
-      <title>${data.title}</title>
-      ${data.status === 200 ? `<link rel="canonical" href="${data.canonical}">` : ''}
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body>
-      ${data.html}
-    </body>
-  </html>`,
-  {
-    status:data.status,
-    headers:{
-      'content-type':'text/html',
-      'x-robots-tag':'noindex'
+const response = (data, url) => {
+
+  // We want to bypass `noindex` when needed, so we can use Google Search Console. We use `index=true` query string parameter for this.
+  const params = new URLSearchParams(url.search);
+
+  // if 'index===true' - have the value index, else noindex. We will use this in the x-robots-tag header.
+  const index = params.get('index') ? `index` : `noindex`;
+
+  return new Response(
+    `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${data.title}</title>
+        ${data.status === 200 ? `<link rel="canonical" href="${data.canonical}">` : ''}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body>
+        ${data.html}
+      </body>
+    </html>`,
+    {
+      status:data.status,
+      headers:{
+        'content-type':'text/html',
+        'x-robots-tag':index
+      }
     }
-  }
-);
+  );
+}
 
