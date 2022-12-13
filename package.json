@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "cloudflare-bot-redirect-geo-excluding-googlebot-js-wrangler",
+  "name": "cloudflare-redirect-geo-excluding-bots-js-wrangler",
   "version": "1.0.0",
   "description": "Cloudflare Worker - Redirect based on location and user-agent",
   "main": "src/index.js",
